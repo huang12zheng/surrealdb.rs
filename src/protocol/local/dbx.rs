@@ -1,7 +1,8 @@
 // use crate::*;
 use once_cell::sync::OnceCell;
-use surrealdb::{Datastore, Session};
+use surrealdb::{Datastore, Error, Response, Session};
 pub static DBX: OnceCell<DbX> = OnceCell::new();
+// surrealdb
 
 pub struct DbX {
     pub datastore: Datastore,
@@ -18,28 +19,33 @@ impl DbX {
         })
     }
 
-    pub async fn raw_execute(&self, txt: String) -> Result<Vec<Value>, Error> {
-        Ok(self
-            .datastore
+    pub async fn raw_execute(&self, txt: String) -> Result<Vec<Response>, Error> {
+        self.datastore
             .execute(&txt, &self.session, None, false)
             .await
-            .unwrap())
     }
-    // pub async fn raw_execute_one(&self, txt: String) -> Result<Vec<Value>, Error> {
-    //     Ok(first(
-    //         self.datastore
-    //             .execute(&txt, &self.session, None, false)
-    //             .await
-    //             .unwrap(),
-    //     ))
-    // }
 }
 
-// fn first(responses: Vec<surrealdb::Response>) -> Vec<Value> {
-//     responses
-//         .into_iter()
-//         .map(|response| response.result.unwrap())
-//         .next()
-//         .map(|result_value| Vec::<Value>::try_from(result_value).unwrap())
-//         .unwrap()
-// }
+pub mod strx {
+    use async_trait::async_trait;
+    use surrealdb::{Error, Response};
+
+    #[async_trait]
+    pub trait StrDb {
+        async fn send(&self) -> Result<Vec<Response>, Error>;
+    }
+    #[async_trait]
+    impl StrDb for &str {
+        async fn send(&self) -> Result<Vec<Response>, Error> {
+            DBX.get().unwrap().raw_execute(self.to_string()).await
+        }
+    }
+
+    #[async_trait]
+    impl StrDb for String {
+        async fn send(&self) -> Result<Vec<Response>, Error> {
+            self.as_str().send().await
+        }
+    }
+}
+pub use strx::*;

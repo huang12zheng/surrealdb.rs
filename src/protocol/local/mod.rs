@@ -1,4 +1,5 @@
 mod dbx;
+use dbx::*;
 #[cfg(not(target_arch = "wasm32"))]
 mod native;
 #[cfg(target_arch = "wasm32")]
@@ -81,26 +82,19 @@ struct Root {
 
 async fn query(request: RequestBuilder) -> Result<Vec<Result<Vec<Value>>>> {
     tracing::info!("{request:?}");
-    let response = request.send().await?.error_for_status()?;
-    let text = response.text().await?;
-    tracing::info!("Response {text}");
-    let responses: Vec<QueryResponse> = serde_json::from_str(&text)?;
+    let responses = request.send().await?;
+
+    tracing::info!("Response {responses:?}");
     let mut vec = Vec::with_capacity(responses.len());
     for response in responses {
-        match response.status {
-            Status::Ok => {
-                if let Some(value) = response.result {
-                    match from_json(value) {
-                        Value::Array(Array(array)) => vec.push(Ok(array)),
-                        Value::None | Value::Null => vec.push(Ok(vec![])),
-                        value => vec.push(Ok(vec![value])),
-                    }
-                }
-            }
-            Status::Err => {
-                if let Some(error) = response.detail {
-                    vec.push(Err(ErrorKind::Query.with_context(error)));
-                }
+        match response.result {
+            Ok(value) => match value {
+                Value::Array(Array(array)) => vec.push(Ok(array)),
+                Value::None | Value::Null => vec.push(Ok(vec![])),
+                value => vec.push(Ok(vec![value])),
+            },
+            Err(error) => {
+                vec.push(Err(ErrorKind::Query.with_context(error)));
             }
         }
     }
