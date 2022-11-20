@@ -1,3 +1,4 @@
+mod dbx;
 #[cfg(not(target_arch = "wasm32"))]
 mod native;
 #[cfg(target_arch = "wasm32")]
@@ -290,23 +291,19 @@ async fn router(
 
     match method {
         Method::Use => {
-            let path = base_url.join(SQL_PATH)?;
+            // let path = base_url.join(SQL_PATH)?;
             let (ns, db) = match &mut params[..] {
                 [Value::Strand(Strand(ns)), Value::Strand(Strand(db))] => {
                     (mem::take(ns), mem::take(db))
                 }
                 _ => unreachable!(),
             };
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .header("NS", &ns)
-                .header("DB", &db)
-                .auth(&auth)
-                .body("RETURN true");
-            take(true, request).await?;
-            headers.insert("NS", HeaderValue::from_str(&ns)?);
-            headers.insert("DB", HeaderValue::from_str(&db)?);
+            #[cfg(feature = "test")]
+            dbx::DbX::new(db, ns, "memory".to_owned());
+            // todo!();
+
+            #[cfg(not(feature = "test"))]
+            dbx::DbX::new(db, ns, "memory".to_owned());
             Ok(DbResponse::Other(Value::None))
         }
 

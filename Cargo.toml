@@ -17,7 +17,7 @@ resolver = "2"
 [features]
 default = ["local"]
 http = ["dep:reqwest", "dep:tokio-util", "dep:indexmap"]
-local = ["dep:tokio-util", "dep:indexmap"]
+local = ["dep:tokio-util", "dep:indexmap", "surrealdb/compute"]
 ws = ["dep:tokio-tungstenite", "dep:tokio-stream", "dep:indexmap", "tokio/time"]
 rustls = ["dep:rustls", "reqwest?/rustls-tls", "tokio-tungstenite?/__rustls-tls"]
 native-tls = ["dep:native-tls", "reqwest?/native-tls", "tokio-tungstenite?/native-tls"]
