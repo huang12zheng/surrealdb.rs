@@ -30,6 +30,8 @@ pub mod strx {
     use async_trait::async_trait;
     use surrealdb::{Error, Response};
 
+    use super::DBX;
+
     #[async_trait]
     pub trait StrDb {
         async fn send(&self) -> Result<Vec<Response>, Error>;
