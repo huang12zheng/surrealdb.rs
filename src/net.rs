@@ -10,4 +10,4 @@ pub use crate::protocol::ws::Client as WsClient;
 
 #[cfg(feature = "local")]
 #[cfg_attr(docsrs, doc(cfg(feature = "local")))]
-pub use crate::protocol::local::Client as WsClient;
+pub use crate::protocol::local::Client as LocalClient;
