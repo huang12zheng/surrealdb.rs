@@ -135,7 +135,7 @@ pub enum Method {
     Version,
 }
 
-#[cfg(not(feature = "local"))]
+#[cfg(any(feature = "http"))]
 impl Method {
     pub(crate) fn as_str(&self) -> &str {
         match self {

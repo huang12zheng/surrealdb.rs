@@ -17,6 +17,7 @@ use indexmap::IndexMap;
 
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::mem;
 use surrealdb::sql::statements::CreateStatement;
 use surrealdb::sql::statements::DeleteStatement;
@@ -31,6 +32,8 @@ use surrealdb::sql::Strand;
 use surrealdb::sql::Value;
 use surrealdb::sql::Values;
 
+use self::dbx::DbX;
+
 type HttpRoute = Route<(Method, Param), Result<DbResponse>>;
 
 /// An HTTP client for communicating with the server via HTTP
@@ -40,25 +43,6 @@ pub struct Client {
 }
 
 type RequestBuilder = String;
-
-// enum Auth {
-//     Basic { user: String, pass: String },
-//     Bearer { token: String },
-// }
-
-// trait Authenticate {
-//     fn auth(self, auth: &Option<Auth>) -> Self;
-// }
-
-// impl Authenticate for RequestBuilder {
-//     fn auth(self, auth: &Option<Auth>) -> Self {
-//         match auth {
-//             Some(Auth::Basic { user, pass }) => self.basic_auth(user, Some(pass)),
-//             Some(Auth::Bearer { token }) => self.bearer_auth(token),
-//             None => self,
-//         }
-//     }
-// }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Root {
@@ -71,6 +55,10 @@ async fn query(request: RequestBuilder) -> Result<Vec<Result<Vec<Value>>>> {
     let responses = request.send().await?;
 
     tracing::info!("Response {responses:?}");
+    into_value(responses)
+}
+
+fn into_value(responses: Vec<surrealdb::Response>) -> Result<Vec<Result<Vec<Value>>>> {
     let mut vec = Vec::with_capacity(responses.len());
     for response in responses {
         match response.result {
@@ -276,11 +264,11 @@ async fn router(
                 _ => unreachable!(),
             };
             #[cfg(feature = "test")]
-            dbx::DbX::new(db, ns, "memory".to_owned());
+            DbX::new(db, ns, "memory".to_owned());
             // todo!();
 
             #[cfg(not(feature = "test"))]
-            dbx::DbX::new(&db, &ns, "memory")
+            DbX::new(&db, &ns, "memory")
                 .await
                 .unwrap_or_else(|_| panic!("use db error: {db} {ns}"));
             Ok(DbResponse::Other(Value::None))
@@ -322,29 +310,32 @@ async fn router(
             let value = take(true, request).await?;
             Ok(DbResponse::Other(value))
         }
-        // Method::Query => {
-        //     let path = base_url.join(SQL_PATH).unwrap();
-        //     let mut request = client
-        //         .post(path)
-        //         .headers(headers.clone())
-        //         .query(&vars)
-        //         .auth(&auth);
-        //     match &mut params[..] {
-        //         [Value::Strand(Strand(statements))] => {
-        //             request = request.body(mem::take(statements));
-        //         }
-        //         [Value::Strand(Strand(statements)), Value::Object(bindings)] => {
-        //             let bindings: Vec<_> = bindings
-        //                 .iter()
-        //                 .map(|(key, value)| (key, value.to_string()))
-        //                 .collect();
-        //             request = request.query(&bindings).body(mem::take(statements));
-        //         }
-        //         _ => unreachable!(),
-        //     }
-        //     let values = query(request).await?;
-        //     Ok(DbResponse::Query(values))
-        // }
+        Method::Query => {
+            let request;
+            let mut qvars: BTreeMap<String, Value> = vars
+                .iter()
+                .map(|(k, v)| (k.clone(), Value::from(v.clone())))
+                .collect();
+            match &mut params[..] {
+                [Value::Strand(Strand(statements))] => {
+                    request = statements;
+                }
+                [Value::Strand(Strand(statements)), Value::Object(bindings)] => {
+                    request = statements;
+                    qvars.extend(bindings.0.clone());
+                }
+                _ => unreachable!(),
+            }
+            let db = DBX.get().unwrap();
+
+            // db.datastore.execute(request, db.sess, vars, false);
+            let values = db
+                .datastore
+                .execute(request, &db.session, Some(qvars), false)
+                .await?;
+            let values = into_value(values)?;
+            Ok(DbResponse::Query(values))
+        }
         // #[cfg(not(target_arch = "wasm32"))]
         // Method::Export => {
         //     let path = base_url.join(Method::Export.as_str()).unwrap();
@@ -410,8 +401,9 @@ async fn router(
         Method::Authenticate => todo!(),
         Method::Health => todo!(),
         Method::Invalidate => todo!(),
-        Method::Query => todo!(),
         Method::Signin => todo!(),
         Method::Signup => todo!(),
+        Method::Export => todo!(),
+        Method::Import => todo!(),
     }
 }
