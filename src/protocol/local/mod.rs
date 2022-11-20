@@ -4,7 +4,7 @@ mod native;
 mod wasm;
 
 use crate::param::from_json;
-use crate::param::from_value;
+
 use crate::param::DbResponse;
 use crate::param::Param;
 use crate::protocol::Status;
@@ -12,26 +12,13 @@ use crate::ErrorKind;
 use crate::Method;
 use crate::Result;
 use crate::Route;
-#[cfg(not(target_arch = "wasm32"))]
-use futures::TryStreamExt;
+// #[cfg(not(target_arch = "wasm32"))]
+// use futures::TryStreamExt;
 use indexmap::IndexMap;
-#[cfg(any(feature = "http", feature = "ws"))]
-use reqwest::header::HeaderMap;
-#[cfg(any(feature = "http", feature = "ws"))]
-use reqwest::header::HeaderValue;
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg(any(feature = "http", feature = "ws"))]
-use reqwest::header::ACCEPT;
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg(any(feature = "http", feature = "ws"))]
-use reqwest::header::CONTENT_TYPE;
-#[cfg(any(feature = "http", feature = "ws"))]
-use reqwest::RequestBuilder;
+
 use serde::Deserialize;
 use serde::Serialize;
 use std::mem;
-#[cfg(not(target_arch = "wasm32"))]
-use std::path::PathBuf;
 use surrealdb::sql::statements::CreateStatement;
 use surrealdb::sql::statements::DeleteStatement;
 use surrealdb::sql::statements::SelectStatement;
@@ -44,14 +31,7 @@ use surrealdb::sql::Output;
 use surrealdb::sql::Strand;
 use surrealdb::sql::Value;
 use surrealdb::sql::Values;
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::fs::OpenOptions;
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::io;
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::io::AsyncReadExt;
-#[cfg(not(target_arch = "wasm32"))]
-use tokio_util::compat::FuturesAsyncReadCompatExt;
+
 use url::Url;
 
 type HttpRoute = Route<(Method, Param), Result<DbResponse>>;
@@ -64,24 +44,26 @@ pub struct Client {
     method: Method,
 }
 
-enum Auth {
-    Basic { user: String, pass: String },
-    Bearer { token: String },
-}
+type RequestBuilder = String;
 
-trait Authenticate {
-    fn auth(self, auth: &Option<Auth>) -> Self;
-}
+// enum Auth {
+//     Basic { user: String, pass: String },
+//     Bearer { token: String },
+// }
 
-impl Authenticate for RequestBuilder {
-    fn auth(self, auth: &Option<Auth>) -> Self {
-        match auth {
-            Some(Auth::Basic { user, pass }) => self.basic_auth(user, Some(pass)),
-            Some(Auth::Bearer { token }) => self.bearer_auth(token),
-            None => self,
-        }
-    }
-}
+// trait Authenticate {
+//     fn auth(self, auth: &Option<Auth>) -> Self;
+// }
+
+// impl Authenticate for RequestBuilder {
+//     fn auth(self, auth: &Option<Auth>) -> Self {
+//         match auth {
+//             Some(Auth::Basic { user, pass }) => self.basic_auth(user, Some(pass)),
+//             Some(Auth::Bearer { token }) => self.bearer_auth(token),
+//             None => self,
+//         }
+//     }
+// }
 
 #[derive(Debug, Deserialize)]
 struct QueryResponse {
@@ -94,19 +76,6 @@ struct QueryResponse {
 struct Root {
     user: String,
     pass: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct AuthResponse {
-    token: Option<String>,
-}
-
-async fn submit_auth(request: RequestBuilder) -> Result<Value> {
-    let response = request.send().await?.error_for_status()?;
-    let text = response.text().await?;
-    tracing::info!("Response {text}");
-    let response: AuthResponse = serde_json::from_str(&text)?;
-    Ok(response.token.filter(|token| token != "NONE").into())
 }
 
 async fn query(request: RequestBuilder) -> Result<Vec<Result<Vec<Value>>>> {
@@ -162,47 +131,52 @@ async fn take(one: bool, request: RequestBuilder) -> Result<Value> {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-async fn export(request: RequestBuilder, file: PathBuf) -> Result<Value> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(file)
-        .await?;
-    let mut response = request
-        .send()
-        .await?
-        .error_for_status()?
-        .bytes_stream()
-        .map_err(|e| futures::io::Error::new(futures::io::ErrorKind::Other, e))
-        .into_async_read()
-        .compat();
-    io::copy(&mut response, &mut file).await?;
-    Ok(Value::None)
-}
+// #[cfg(not(target_arch = "wasm32"))]
+// async fn export(request: RequestBuilder, file: PathBuf) -> Result<Value> {
+//     let mut file = OpenOptions::new()
+//         .write(true)
+//         .create(true)
+//         .truncate(true)
+//         .open(file)
+//         .await?;
+//     let mut response = request
+//         .send()
+//         .await?
+//         .error_for_status()?
+//         .bytes_stream()
+//         .map_err(|e| futures::io::Error::new(futures::io::ErrorKind::Other, e))
+//         .into_async_read()
+//         .compat();
+//     io::copy(&mut response, &mut file).await?;
+//     Ok(Value::None)
+// }
 
-#[cfg(not(target_arch = "wasm32"))]
-async fn import(request: RequestBuilder, file: PathBuf) -> Result<Value> {
-    let mut file = OpenOptions::new().read(true).open(file).await?;
-    let mut contents = vec![];
-    file.read_to_end(&mut contents).await?;
-    // ideally we should pass `file` directly into the body
-    // but currently that results in
-    // "HTTP status client error (405 Method Not Allowed) for url"
-    request.body(contents).send().await?.error_for_status()?;
-    Ok(Value::None)
-}
+// #[cfg(not(target_arch = "wasm32"))]
+// async fn import(request: RequestBuilder, file: PathBuf) -> Result<Value> {
+//     let mut file = OpenOptions::new().read(true).open(file).await?;
+//     let mut contents = vec![];
+//     file.read_to_end(&mut contents).await?;
+//     // ideally we should pass `file` directly into the body
+//     // but currently that results in
+//     // "HTTP status client error (405 Method Not Allowed) for url"
+//     request.body(contents).send().await?.error_for_status()?;
+//     Ok(Value::None)
+// }
 
-async fn version(request: RequestBuilder) -> Result<Value> {
-    let response = request.send().await?.error_for_status()?;
-    let version = response.text().await?;
-    Ok(version.into())
-}
+fn version() -> Result<Value> {
+    use once_cell::sync::Lazy;
 
-async fn health(request: RequestBuilder) -> Result<Value> {
-    request.send().await?.error_for_status()?;
-    Ok(Value::None)
+    pub const PKG_NAME: &str = "surrealdb";
+    pub static PKG_VERSION: Lazy<String> =
+        Lazy::new(|| match option_env!("SURREAL_BUILD_METADATA") {
+            Some(metadata) if !metadata.trim().is_empty() => {
+                let version = env!("CARGO_PKG_VERSION");
+                format!("{version}+{metadata}")
+            }
+            _ => env!("CARGO_PKG_VERSION").to_owned(),
+        });
+    let val = format!("{}-{}", PKG_NAME, *PKG_VERSION);
+    Ok(val.into())
 }
 
 fn split_params(params: &mut [Value]) -> (bool, Values, Value) {
@@ -308,10 +282,9 @@ fn delete_statement(params: &mut [Value]) -> DeleteStatement {
 async fn router(
     (method, param): (Method, Param),
     base_url: &Url,
-    client: &reqwest::Client,
-    headers: &mut HeaderMap,
+    // client: &reqwest::Client,
+    // headers: &mut HeaderMap,
     vars: &mut IndexMap<String, String>,
-    auth: &mut Option<Auth>,
 ) -> Result<DbResponse> {
     let mut params = param.query;
 
@@ -336,151 +309,72 @@ async fn router(
             headers.insert("DB", HeaderValue::from_str(&db)?);
             Ok(DbResponse::Other(Value::None))
         }
-        Method::Signin => {
-            let path = base_url.join(Method::Signin.as_str())?;
-            let credentials = match &params[..] {
-                [credentials] => serde_json::to_string(credentials)?,
-                _ => unreachable!(),
-            };
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .body(credentials);
-            let value = submit_auth(request).await?;
-            if let [credentials] = &params[..] {
-                if let Ok(Root { user, pass }) = from_value(credentials) {
-                    *auth = Some(Auth::Basic { user, pass });
-                } else {
-                    *auth = Some(Auth::Bearer {
-                        token: value.to_strand().as_string(),
-                    });
-                }
-            }
-            Ok(DbResponse::Other(value))
-        }
-        Method::Signup => {
-            let path = base_url.join(Method::Signup.as_str())?;
-            let credentials = match &params[..] {
-                [credentials] => serde_json::to_string(credentials)?,
-                _ => unreachable!(),
-            };
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .body(credentials);
-            let value = submit_auth(request).await?;
-            Ok(DbResponse::Other(value))
-        }
-        Method::Authenticate => {
-            let path = base_url.join(SQL_PATH)?;
-            let token = match &mut params[..1] {
-                [Value::Strand(Strand(token))] => mem::take(token),
-                _ => unreachable!(),
-            };
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .bearer_auth(&token)
-                .body("RETURN true");
-            take(true, request).await?;
-            *auth = Some(Auth::Bearer { token });
-            Ok(DbResponse::Other(Value::None))
-        }
-        Method::Invalidate => {
-            *auth = None;
-            Ok(DbResponse::Other(Value::None))
-        }
+
         Method::Create => {
             let path = base_url.join(SQL_PATH)?;
             let statement = create_statement(&mut params);
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .body(statement.to_string());
+            let request = statement.to_string();
             let value = take(true, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Update => {
             let path = base_url.join(SQL_PATH)?;
             let (one, statement) = update_statement(&mut params);
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .body(statement.to_string());
+            let request = statement.to_string();
             let value = take(one, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Patch => {
             let path = base_url.join(SQL_PATH)?;
             let (one, statement) = patch_statement(&mut params);
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .body(statement.to_string());
+            let request = statement.to_string();
             let value = take(one, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Merge => {
             let path = base_url.join(SQL_PATH)?;
             let (one, statement) = merge_statement(&mut params);
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .body(statement.to_string());
+            let request = statement.to_string();
             let value = take(one, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Select => {
             let path = base_url.join(SQL_PATH)?;
             let (one, statement) = select_statement(&mut params);
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .body(statement.to_string());
+            let request = statement.to_string();
             let value = take(one, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Delete => {
             let path = base_url.join(SQL_PATH)?;
             let statement = delete_statement(&mut params);
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .body(statement.to_string());
+            let request = statement.to_string();
             let value = take(true, request).await?;
             Ok(DbResponse::Other(value))
         }
-        Method::Query => {
-            let path = base_url.join(SQL_PATH).unwrap();
-            let mut request = client
-                .post(path)
-                .headers(headers.clone())
-                .query(&vars)
-                .auth(&auth);
-            match &mut params[..] {
-                [Value::Strand(Strand(statements))] => {
-                    request = request.body(mem::take(statements));
-                }
-                [Value::Strand(Strand(statements)), Value::Object(bindings)] => {
-                    let bindings: Vec<_> = bindings
-                        .iter()
-                        .map(|(key, value)| (key, value.to_string()))
-                        .collect();
-                    request = request.query(&bindings).body(mem::take(statements));
-                }
-                _ => unreachable!(),
-            }
-            let values = query(request).await?;
-            Ok(DbResponse::Query(values))
-        }
+        // Method::Query => {
+        //     let path = base_url.join(SQL_PATH).unwrap();
+        //     let mut request = client
+        //         .post(path)
+        //         .headers(headers.clone())
+        //         .query(&vars)
+        //         .auth(&auth);
+        //     match &mut params[..] {
+        //         [Value::Strand(Strand(statements))] => {
+        //             request = request.body(mem::take(statements));
+        //         }
+        //         [Value::Strand(Strand(statements)), Value::Object(bindings)] => {
+        //             let bindings: Vec<_> = bindings
+        //                 .iter()
+        //                 .map(|(key, value)| (key, value.to_string()))
+        //                 .collect();
+        //             request = request.query(&bindings).body(mem::take(statements));
+        //         }
+        //         _ => unreachable!(),
+        //     }
+        //     let values = query(request).await?;
+        //     Ok(DbResponse::Query(values))
+        // }
         // #[cfg(not(target_arch = "wasm32"))]
         // Method::Export => {
         //     let path = base_url.join(Method::Export.as_str()).unwrap();
@@ -505,16 +399,9 @@ async fn router(
         //     let value = import(request, file).await?;
         //     Ok(DbResponse::Other(value))
         // }
-        Method::Health => {
-            let path = base_url.join(Method::Health.as_str()).unwrap();
-            let request = client.get(path);
-            let value = health(request).await?;
-            Ok(DbResponse::Other(value))
-        }
         Method::Version => {
             let path = base_url.join(method.as_str()).unwrap();
-            let request = client.get(path);
-            let value = version(request).await?;
+            let value = version()?;
             Ok(DbResponse::Other(value))
         }
         Method::Set => {
@@ -523,12 +410,7 @@ async fn router(
                 [Value::Strand(Strand(key)), value] => (mem::take(key), value.to_string()),
                 _ => unreachable!(),
             };
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .query(&[(key.as_str(), value.as_str())])
-                .body(format!("RETURN ${key}"));
+            let request = format!("RETURN ${key}");
             take(true, request).await?;
             vars.insert(key, value);
             Ok(DbResponse::Other(Value::None))
@@ -545,12 +427,7 @@ async fn router(
                 [table] => table.to_string(),
                 _ => unreachable!(),
             };
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .query(&[("table", table)])
-                .body("LIVE SELECT * FROM type::table($table)");
+            let request = format!("LIVE SELECT * FROM type::table({table})");
             let value = take(true, request).await?;
             Ok(DbResponse::Other(value))
         }
@@ -560,14 +437,15 @@ async fn router(
                 [id] => id.to_string(),
                 _ => unreachable!(),
             };
-            let request = client
-                .post(path)
-                .headers(headers.clone())
-                .auth(&auth)
-                .query(&[("id", id)])
-                .body("KILL type::string($id)");
+            let request = format!("KILL type::string({id})");
             let value = take(true, request).await?;
             Ok(DbResponse::Other(value))
         }
+        Method::Authenticate => todo!(),
+        Method::Health => todo!(),
+        Method::Invalidate => todo!(),
+        Method::Query => todo!(),
+        Method::Signin => todo!(),
+        Method::Signup => todo!(),
     }
 }

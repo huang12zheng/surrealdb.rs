@@ -17,10 +17,7 @@ use flume::Receiver;
 use futures::StreamExt;
 use indexmap::IndexMap;
 use once_cell::sync::OnceCell;
-use reqwest::header::HeaderMap;
-use reqwest::header::HeaderValue;
-use reqwest::header::ACCEPT;
-use reqwest::ClientBuilder;
+
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 #[cfg(feature = "ws")]
@@ -39,34 +36,14 @@ impl Connection for Client {
     }
 
     async fn connect(address: ServerAddrs, capacity: usize) -> Result<Surreal<Self>> {
-        let mut headers = HeaderMap::new();
-        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
-
-        #[allow(unused_mut)]
-        let mut builder = ClientBuilder::new().default_headers(headers);
-
-        #[cfg(any(feature = "native-tls", feature = "rustls"))]
-        if let Some(tls) = address.tls_config {
-            builder = match tls {
-                #[cfg(feature = "native-tls")]
-                Tls::Native(config) => builder.use_preconfigured_tls(config),
-                #[cfg(feature = "rustls")]
-                Tls::Rust(config) => builder.use_preconfigured_tls(config),
-            };
-        }
-
-        let client = builder.build()?;
-
         let base_url = address.endpoint;
-
-        super::health(client.get(base_url.join(Method::Health.as_str())?)).await?;
 
         let (route_tx, route_rx) = match capacity {
             0 => flume::unbounded(),
             capacity => flume::bounded(capacity),
         };
 
-        router(base_url, client, route_rx);
+        router(base_url, route_rx);
 
         Ok(Surreal {
             router: OnceCell::with_value(Arc::new(Router {
@@ -117,9 +94,8 @@ impl Connection for Client {
     }
 }
 
-fn router(base_url: Url, client: reqwest::Client, route_rx: Receiver<Option<HttpRoute>>) {
+fn router(base_url: Url, route_rx: Receiver<Option<HttpRoute>>) {
     tokio::spawn(async move {
-        let mut headers = HeaderMap::new();
         let mut vars = IndexMap::new();
         let mut auth = None;
         let mut stream = route_rx.into_stream();
@@ -128,8 +104,8 @@ fn router(base_url: Url, client: reqwest::Client, route_rx: Receiver<Option<Http
             match super::router(
                 route.request,
                 &base_url,
-                &client,
-                &mut headers,
+                // &client,
+                // &mut headers,
                 &mut vars,
                 &mut auth,
             )
