@@ -24,7 +24,6 @@ use std::marker::PhantomData;
 use std::sync::atomic::AtomicI64;
 use std::sync::Arc;
 use surrealdb::sql::Value;
-use url::Url;
 
 #[async_trait]
 impl Connection for Client {
@@ -36,14 +35,14 @@ impl Connection for Client {
     }
 
     async fn connect(address: ServerAddrs, capacity: usize) -> Result<Surreal<Self>> {
-        let base_url = address.endpoint;
+        let _base_url = address.endpoint;
 
         let (route_tx, route_rx) = match capacity {
             0 => flume::unbounded(),
             capacity => flume::bounded(capacity),
         };
 
-        router(base_url, route_rx);
+        router(route_rx);
 
         Ok(Surreal {
             router: OnceCell::with_value(Arc::new(Router {
@@ -94,21 +93,13 @@ impl Connection for Client {
     }
 }
 
-fn router(base_url: Url, route_rx: Receiver<Option<HttpRoute>>) {
+fn router(route_rx: Receiver<Option<HttpRoute>>) {
     tokio::spawn(async move {
         let mut vars = IndexMap::new();
         let mut stream = route_rx.into_stream();
 
         while let Some(Some(route)) = stream.next().await {
-            match super::router(
-                route.request,
-                &base_url,
-                // &client,
-                // &mut headers,
-                &mut vars,
-            )
-            .await
-            {
+            match super::router(route.request, &mut vars).await {
                 Ok(value) => {
                     let _ = route.response.into_send_async(Ok(value)).await;
                 }

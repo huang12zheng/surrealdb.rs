@@ -31,11 +31,7 @@ use surrealdb::sql::Strand;
 use surrealdb::sql::Value;
 use surrealdb::sql::Values;
 
-use url::Url;
-
 type HttpRoute = Route<(Method, Param), Result<DbResponse>>;
-
-const SQL_PATH: &str = "sql";
 
 /// An HTTP client for communicating with the server via HTTP
 #[derive(Debug, Clone)]
@@ -266,16 +262,13 @@ fn delete_statement(params: &mut [Value]) -> DeleteStatement {
 
 async fn router(
     (method, param): (Method, Param),
-    base_url: &Url,
-    // client: &reqwest::Client,
-    // headers: &mut HeaderMap,
     vars: &mut IndexMap<String, String>,
 ) -> Result<DbResponse> {
     let mut params = param.query;
 
     match method {
         Method::Use => {
-            // let path = base_url.join(SQL_PATH)?;
+            //
             let (ns, db) = match &mut params[..] {
                 [Value::Strand(Strand(ns)), Value::Strand(Strand(db))] => {
                     (mem::take(ns), mem::take(db))
@@ -294,42 +287,36 @@ async fn router(
         }
 
         Method::Create => {
-            let path = base_url.join(SQL_PATH)?;
             let statement = create_statement(&mut params);
             let request = statement.to_string();
             let value = take(true, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Update => {
-            let path = base_url.join(SQL_PATH)?;
             let (one, statement) = update_statement(&mut params);
             let request = statement.to_string();
             let value = take(one, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Patch => {
-            let path = base_url.join(SQL_PATH)?;
             let (one, statement) = patch_statement(&mut params);
             let request = statement.to_string();
             let value = take(one, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Merge => {
-            let path = base_url.join(SQL_PATH)?;
             let (one, statement) = merge_statement(&mut params);
             let request = statement.to_string();
             let value = take(one, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Select => {
-            let path = base_url.join(SQL_PATH)?;
             let (one, statement) = select_statement(&mut params);
             let request = statement.to_string();
             let value = take(one, request).await?;
             Ok(DbResponse::Other(value))
         }
         Method::Delete => {
-            let path = base_url.join(SQL_PATH)?;
             let statement = delete_statement(&mut params);
             let request = statement.to_string();
             let value = take(true, request).await?;
@@ -383,12 +370,10 @@ async fn router(
         //     Ok(DbResponse::Other(value))
         // }
         Method::Version => {
-            let path = base_url.join(method.as_str()).unwrap();
             let value = version()?;
             Ok(DbResponse::Other(value))
         }
         Method::Set => {
-            let path = base_url.join(SQL_PATH)?;
             let (key, value) = match &mut params[..2] {
                 [Value::Strand(Strand(key)), value] => (mem::take(key), value.to_string()),
                 _ => unreachable!(),
@@ -405,7 +390,6 @@ async fn router(
             Ok(DbResponse::Other(Value::None))
         }
         Method::Live => {
-            let path = base_url.join(SQL_PATH)?;
             let table = match &params[..] {
                 [table] => table.to_string(),
                 _ => unreachable!(),
@@ -415,7 +399,6 @@ async fn router(
             Ok(DbResponse::Other(value))
         }
         Method::Kill => {
-            let path = base_url.join(SQL_PATH)?;
             let id = match &params[..] {
                 [id] => id.to_string(),
                 _ => unreachable!(),
