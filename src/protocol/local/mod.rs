@@ -5,11 +5,8 @@ mod native;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
-use crate::param::from_json;
-
 use crate::param::DbResponse;
 use crate::param::Param;
-use crate::protocol::Status;
 use crate::ErrorKind;
 use crate::Method;
 use crate::Result;
@@ -66,13 +63,6 @@ type RequestBuilder = String;
 //         }
 //     }
 // }
-
-#[derive(Debug, Deserialize)]
-struct QueryResponse {
-    status: Status,
-    result: Option<serde_json::Value>,
-    detail: Option<String>,
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Root {
@@ -297,7 +287,9 @@ async fn router(
             // todo!();
 
             #[cfg(not(feature = "test"))]
-            dbx::DbX::new(db, ns, "memory".to_owned());
+            dbx::DbX::new(&db, &ns, "memory")
+                .await
+                .unwrap_or_else(|_| panic!("use db error: {db} {ns}"));
             Ok(DbResponse::Other(Value::None))
         }
 

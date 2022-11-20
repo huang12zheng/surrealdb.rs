@@ -10,9 +10,9 @@ pub struct DbX {
 }
 
 impl DbX {
-    pub async fn new(namespace: String, database: String, path: String) -> Result<(), DbX> {
-        let datastore = Datastore::new(&path).await.unwrap();
-        let session = Session::for_db(namespace.to_string(), database.to_string());
+    pub async fn new(namespace: &str, database: &str, path: &str) -> Result<(), DbX> {
+        let datastore = Datastore::new(path).await.unwrap();
+        let session = Session::for_db(namespace, database);
         DBX.set(Self {
             datastore,
             session: session,
