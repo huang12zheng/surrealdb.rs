@@ -97,7 +97,6 @@ impl Connection for Client {
 fn router(base_url: Url, route_rx: Receiver<Option<HttpRoute>>) {
     tokio::spawn(async move {
         let mut vars = IndexMap::new();
-        let mut auth = None;
         let mut stream = route_rx.into_stream();
 
         while let Some(Some(route)) = stream.next().await {
@@ -107,7 +106,6 @@ fn router(base_url: Url, route_rx: Receiver<Option<HttpRoute>>) {
                 // &client,
                 // &mut headers,
                 &mut vars,
-                &mut auth,
             )
             .await
             {
