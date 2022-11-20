@@ -1,4 +1,4 @@
-#![cfg(any(feature = "http", feature = "ws"))]
+#![cfg(any(feature = "http", feature = "ws", feature = "local"))]
 #![cfg(not(target_arch = "wasm32"))]
 
 mod protocol;

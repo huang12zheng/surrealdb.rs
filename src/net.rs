@@ -7,3 +7,7 @@ pub use crate::protocol::http::Client as HttpClient;
 #[cfg(feature = "ws")]
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 pub use crate::protocol::ws::Client as WsClient;
+
+#[cfg(feature = "local")]
+#[cfg_attr(docsrs, doc(cfg(feature = "local")))]
+pub use crate::protocol::local::Client as WsClient;

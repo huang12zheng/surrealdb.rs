@@ -2,6 +2,8 @@
 
 #[cfg(feature = "http")]
 pub(crate) mod http;
+#[cfg(feature = "local")]
+pub(crate) mod local;
 #[cfg(feature = "ws")]
 pub(crate) mod ws;
 
@@ -30,6 +32,17 @@ pub struct Ws;
 #[cfg_attr(docsrs, doc(cfg(feature = "ws")))]
 #[derive(Debug)]
 pub struct Wss;
+/// The Local scheme used to connect to surrealdb path
+#[cfg(feature = "local")]
+#[cfg_attr(docsrs, doc(cfg(feature = "local")))]
+#[derive(Debug)]
+pub struct Local;
+
+/// (no use tls for local)[The Local scheme used to connect to `wss://` endpoints]
+// #[cfg(feature = "local")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "local")))]
+// #[derive(Debug)]
+// pub struct Locals;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]

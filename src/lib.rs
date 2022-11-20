@@ -90,19 +90,25 @@
 //! }
 //! ```
 
-#[cfg(not(any(feature = "http", feature = "ws")))]
-compile_error!("Either feature \"http\" or \"ws\" must be enabled for this crate.");
+#[cfg(not(any(feature = "http", feature = "ws", feature = "local")))]
+compile_error!("Either feature \"http\" or \"ws\" or \"local\" must be enabled for this crate.");
 
 mod err;
 
 pub mod method;
 
-#[cfg(any(feature = "http", feature = "ws"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "http", feature = "ws"))))]
+#[cfg(any(feature = "http", feature = "ws", feature = "local"))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(any(feature = "http", feature = "ws", feature = "local")))
+)]
 pub mod net;
 pub mod param;
-#[cfg(any(feature = "http", feature = "ws"))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "http", feature = "ws"))))]
+#[cfg(any(feature = "http", feature = "ws", feature = "local"))]
+#[cfg_attr(
+    docsrs,
+    doc(cfg(any(feature = "http", feature = "ws", feature = "local")))
+)]
 pub mod protocol;
 
 pub use err::Error;

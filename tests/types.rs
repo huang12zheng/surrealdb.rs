@@ -1,4 +1,4 @@
-#![cfg(any(feature = "ws", feature = "http"))]
+#![cfg(any(feature = "ws", feature = "http", feature = "local"))]
 
 use serde::Deserialize;
 use serde::Serialize;
